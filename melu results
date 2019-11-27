@@ -1,0 +1,9 @@
+1) Warm_start
+local update:	0	1	2	3	4	5
+MAE	    :	3.91	3.72	3.83	3.57	3.80	3.98
+
+2) user_cold start
+local update:	0	1	2	3	4	5
+MAE	    :	3.85	3.92	3.89	3.62	3.83	3.73
+
+
