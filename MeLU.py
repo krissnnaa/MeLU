@@ -61,23 +61,33 @@ class MeLU(torch.nn.Module):
         self.fast_weights = OrderedDict()
 
     def forward(self, support_set_x, support_set_y, query_set_x, num_local_update):
-        for idx in range(num_local_update):
-            if idx > 0:
-                self.model.load_state_dict(self.fast_weights)
-            weight_for_local_update = list(self.model.state_dict().values())
+        #Krishna changed
+        if num_local_update==0:
             support_set_y_pred = self.model(support_set_x)
-            loss = F.mse_loss(support_set_y_pred, support_set_y.view(-1, 1))
-            self.model.zero_grad()
-            grad = torch.autograd.grad(loss, self.model.parameters(), create_graph=True)
-            # local update
-            for i in range(self.weight_len):
-                if self.weight_name[i] in self.local_update_target_weight_name:
-                    self.fast_weights[self.weight_name[i]] = weight_for_local_update[i] - self.local_lr * grad[i]
-                else:
-                    self.fast_weights[self.weight_name[i]] = weight_for_local_update[i]
-        self.model.load_state_dict(self.fast_weights)
-        query_set_y_pred = self.model(query_set_x)
-        self.model.load_state_dict(self.keep_weight)
+            query_set_y_pred = self.model(query_set_x)
+
+        else:
+            for idx in range(num_local_update):
+                if idx > 0:
+                    self.model.load_state_dict(self.fast_weights)
+                weight_for_local_update = list(self.model.state_dict().values())
+                support_set_y_pred = self.model(support_set_x)
+                # loss = F.mse_loss(support_set_y_pred, support_set_y.view(-1, 1))
+                #krishna changed
+                t = torch.nn.L1Loss()
+                loss=t( support_set_y_pred, support_set_y.view(-1, 1))
+
+                self.model.zero_grad()
+                grad = torch.autograd.grad(loss, self.model.parameters(), create_graph=True)
+                # local update
+                for i in range(self.weight_len):
+                    if self.weight_name[i] in self.local_update_target_weight_name:
+                        self.fast_weights[self.weight_name[i]] = weight_for_local_update[i] - self.local_lr * grad[i]
+                    else:
+                        self.fast_weights[self.weight_name[i]] = weight_for_local_update[i]
+            self.model.load_state_dict(self.fast_weights)
+            query_set_y_pred = self.model(query_set_x)
+            self.model.load_state_dict(self.keep_weight)
         return query_set_y_pred
 
     def global_update(self, support_set_xs, support_set_ys, query_set_xs, query_set_ys, num_local_update):
@@ -91,7 +101,9 @@ class MeLU(torch.nn.Module):
                 query_set_ys[i] = query_set_ys[i].cuda()
         for i in range(batch_sz):
             query_set_y_pred = self.forward(support_set_xs[i], support_set_ys[i], query_set_xs[i], num_local_update)
-            loss_q = F.mse_loss(query_set_y_pred, query_set_ys[i].view(-1, 1))
+            #loss_q = F.mse_loss(query_set_y_pred, query_set_ys[i].view(-1, 1))
+            t = torch.nn.L1Loss()
+            loss_q = t(query_set_y_pred, query_set_ys[i].view(-1, 1))
             losses_q.append(loss_q)
         losses_q = torch.stack(losses_q).mean(0)
         self.meta_optim.zero_grad()
